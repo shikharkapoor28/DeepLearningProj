@@ -1,0 +1,64 @@
+# Configurations for Deep Trading RL System
+
+data:
+  sources:
+    - exchange: "binance"
+      symbol: "BTC/USDT"
+      timeframe: "1h"
+      start_date: "2020-01-01"
+      end_date: "2023-12-31"
+  feature_selection:
+    - "close_returns"
+    - "volume_log"
+    - "rsi_14"
+    - "macd"
+    - "atr_14"
+    - "bollinger_bands"
+
+environment:
+  initial_balance: 100000.0
+  trading_fee_bps: 6      # 0.06% typical taker fee
+  slippage_bps: 2         # 0.02% assumed slippage
+  reward_scaling: 100.0
+  max_drawdown_stop: 0.30 # Stop episode if drawdown exceeds 30%
+
+rl_algorithm:
+  name: "PPO"
+  hyperparameters:
+    learning_rate: 3.0e-4
+    n_steps: 2048
+    batch_size: 256
+    n_epochs: 10
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.2
+    ent_coef: 0.01
+
+model_architecture:
+  encoder: "transformer"
+  seq_len: 64
+  d_model: 128
+  n_heads: 4
+  n_layers: 2
+  actor_critic:
+    hidden_dims: [256, 128]
+
+evaluation:
+  metrics:
+    - "sharpe_ratio"
+    - "sortino_ratio"
+    - "max_drawdown"
+    - "calmar_ratio"
+  walk_forward:
+    train_window_days: 365
+    test_window_days: 90
+  baseline_comparisons:
+    - "buy_and_hold"
+    - "sac_agent"
+    - "dqn_agent"
+
+research:
+  ablations:
+    use_transformer: true
+    use_transaction_costs: true
+    use_attention_masking: false
