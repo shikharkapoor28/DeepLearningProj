@@ -18,6 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 manager = ConnectionManager()
 
 # Global state for simulation
