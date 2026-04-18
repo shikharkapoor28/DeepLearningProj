@@ -8,11 +8,21 @@ import { motion } from "framer-motion";
 export function DecisionPanel({ action, explanation }: { action?: TradeAction, explanation?: Explanation }) {
   if (!action || !explanation) return <Panel title="Agent Decision">Waiting...</Panel>;
 
-  const btcWeight = action.target_weights["BTC"] || 0;
-  const usdtWeight = action.target_weights["USDT"] || (1 - btcWeight);
+  // Support both crypto (BTC/USDT) and equities demo (SPY/Cash)
+  const riskyKey = action.target_weights["SPY"] !== undefined ? "SPY" : "BTC";
+  const cashKey = riskyKey === "SPY" ? "Cash" : "USDT";
+
+  const riskyWeight = action.target_weights[riskyKey] ?? 0;
+  const cashWeight = action.target_weights[cashKey] ?? (1 - riskyWeight);
   
   const lastTrade = action.executed_trades[action.executed_trades.length - 1];
   
+  const delta = lastTrade?.amount ?? 0;
+  const label =
+    delta < 0.01
+      ? `REBALANCE ${(riskyWeight * 100).toFixed(0)}%`
+      : (lastTrade?.side?.toUpperCase() ?? "HOLD");
+
   let actionColor = "text-zinc-400";
   if (lastTrade?.side === "buy") actionColor = "text-green-400";
   if (lastTrade?.side === "sell") actionColor = "text-red-400";
@@ -24,13 +34,13 @@ export function DecisionPanel({ action, explanation }: { action?: TradeAction, e
         <div className="flex flex-col">
           <span className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Last Action</span>
           <span className={`text-2xl font-bold uppercase tracking-tight ${actionColor}`}>
-            {lastTrade?.side || "HOLD"}
+            {label}
           </span>
         </div>
-        <div className="h-10 w-[1px] bg-zinc-800" />
+        <div className="h-10 w-px bg-zinc-800" />
         <div className="flex flex-col items-end">
            <span className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Conviction</span>
-           <span className="text-xl font-mono text-zinc-300">{(Math.max(btcWeight, usdtWeight) * 100).toFixed(1)}%</span>
+           <span className="text-xl font-mono text-zinc-300">{(Math.max(riskyWeight, cashWeight) * 100).toFixed(1)}%</span>
         </div>
       </div>
 
@@ -40,12 +50,12 @@ export function DecisionPanel({ action, explanation }: { action?: TradeAction, e
           <span>Target Allocation</span>
         </div>
         <div className="h-2 w-full bg-zinc-800 rounded-full flex overflow-hidden">
-           <motion.div animate={{ width: `${btcWeight * 100}%` }} className="bg-blue-500 h-full" transition={{ type: "spring" }} />
-           <motion.div animate={{ width: `${usdtWeight * 100}%` }} className="bg-zinc-600 h-full" transition={{ type: "spring" }} />
+           <motion.div animate={{ width: `${riskyWeight * 100}%` }} className="bg-blue-500 h-full" transition={{ type: "spring" }} />
+           <motion.div animate={{ width: `${cashWeight * 100}%` }} className="bg-zinc-600 h-full" transition={{ type: "spring" }} />
         </div>
         <div className="flex justify-between mt-1.5 text-zinc-500">
-          <span>{Math.round(btcWeight * 100)}% BTC</span>
-          <span>{Math.round(usdtWeight * 100)}% USDT</span>
+          <span>{Math.round(riskyWeight * 100)}% {riskyKey}</span>
+          <span>{Math.round(cashWeight * 100)}% {cashKey}</span>
         </div>
       </div>
 
@@ -71,7 +81,7 @@ export function DecisionPanel({ action, explanation }: { action?: TradeAction, e
                   <motion.div 
                     initial={{ width: 0 }} 
                     animate={{ width: `${weight * 100}%` }} 
-                    className="h-full bg-gradient-to-r from-blue-600 to-blue-400"
+                    className="h-full bg-linear-to-r from-blue-600 to-blue-400"
                     transition={{ type: "spring", stiffness: 50 }} 
                   />
                 </div>
