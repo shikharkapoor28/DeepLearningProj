@@ -75,5 +75,5 @@ class Evaluator:
             "cumulative_return": cumulative_return,
             "sharpe_ratio": sharpe,
             "sortino_ratio": sortino,
-            "max_drawdown": max_drawdown
+            "max_drawdown": float(max_drawdown)
         }

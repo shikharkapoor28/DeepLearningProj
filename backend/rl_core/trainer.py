@@ -5,6 +5,7 @@ import numpy as np
 import gymnasium as gym
 from stable_baselines3 import PPO, SAC, DQN
 from stable_baselines3.common.callbacks import BaseCallback
+from typing import Optional
 
 class TradingCallback(BaseCallback):
     """
@@ -57,15 +58,51 @@ class RLTrainer:
                 clip_range=hyperparams.get("clip_range", 0.2),
                 ent_coef=hyperparams.get("ent_coef", 0.01),
                 verbose=1,
-                tensorboard_log="experiments/runs/"
+                # Tensorboard is optional; if it's not installed we disable logging.
+                tensorboard_log=("experiments/runs/" if self._has_tensorboard() else None)
             )
         else:
             raise NotImplementedError(f"Algorithm {algo_name} is not fully integrated yet.")
+
+    @staticmethod
+    def _has_tensorboard() -> bool:
+        try:
+            import tensorboard  # noqa: F401
+            return True
+        except Exception:
+            return False
 
     def train(self, total_timesteps: int = 100000):
         """Executes the training loop."""
         callback = TradingCallback()
         print(f"Starting training for {total_timesteps} timesteps...")
+        self.model.learn(total_timesteps=total_timesteps, callback=callback)
+        print("Training complete.")
+
+    def train_with_eval(
+        self,
+        total_timesteps: int,
+        eval_env: gym.Env,
+        eval_freq: int = 10_000,
+        best_model_save_path: str = "experiments/checkpoints/best",
+    ):
+        """
+        Train with periodic evaluation and automatically save the best model.
+        Metric used by Stable-Baselines3 EvalCallback is mean reward on eval episodes.
+        """
+        from stable_baselines3.common.callbacks import EvalCallback, CallbackList
+
+        os.makedirs(best_model_save_path, exist_ok=True)
+        eval_cb = EvalCallback(
+            eval_env,
+            best_model_save_path=best_model_save_path,
+            log_path=best_model_save_path,
+            eval_freq=max(1, int(eval_freq)),
+            deterministic=True,
+            render=False,
+        )
+        callback = CallbackList([TradingCallback(), eval_cb])
+        print(f"Starting training for {total_timesteps} timesteps with eval_freq={eval_freq}...")
         self.model.learn(total_timesteps=total_timesteps, callback=callback)
         print("Training complete.")
         

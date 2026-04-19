@@ -46,3 +46,19 @@ class YahooFinanceFetcher:
         except Exception as e:
             print(f"Error fetching latest data: {e}")
             return pd.DataFrame()
+
+    def fetch_recent(self, period: str = "1d", interval: str = "1m") -> pd.DataFrame:
+        """
+        Fetches a recent window of candles (useful to seed rolling indicators).
+        Example: period='1d', interval='1m' gives today's intraday minute bars.
+        """
+        try:
+            df_list = []
+            for ticker in self.tickers:
+                data = yf.download(ticker, period=period, interval=interval, progress=False)
+                data["Ticker"] = ticker
+                df_list.append(data)
+            return pd.concat(df_list)
+        except Exception as e:
+            print(f"Error fetching recent data: {e}")
+            return pd.DataFrame()

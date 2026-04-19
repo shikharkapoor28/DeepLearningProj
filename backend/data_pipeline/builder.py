@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 class DatasetBuilder:
     """
@@ -43,3 +43,33 @@ class DatasetBuilder:
         state_vectors = spy_data[norm_cols].values
         
         return spy_data, state_vectors
+
+    def build_trading_env(
+        self,
+        start_date: str,
+        end_date: str,
+        config: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        End-to-end: fetch Yahoo history, engineer features, return a TradingEnv on real bars.
+        Requires `seq_len` in config to match or be less than available rows (needs seq_len+1 rows).
+        """
+        from environment.trading_env import TradingEnv
+
+        spy_df, _ = self.build_dataset(start_date, end_date)
+        if spy_df.empty:
+            raise ValueError("No data returned for the given date range / ticker.")
+
+        norm_cols = [c for c in spy_df.columns if c.endswith("_norm")]
+        if not norm_cols:
+            raise ValueError("No normalized feature columns; run feature engineering first.")
+
+        feature_matrix = spy_df[norm_cols].to_numpy(dtype=np.float32)
+        close_prices = spy_df["Close"].to_numpy(dtype=np.float64)
+
+        return TradingEnv(
+            config=config,
+            feature_matrix=feature_matrix,
+            close_prices=close_prices,
+            feature_columns=norm_cols,
+        )
