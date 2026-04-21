@@ -33,7 +33,7 @@ export function MarketView({ history }: { history: SimulationPayload[] }) {
         <div>
           <h3 className="text-3xl font-bold text-white tracking-tight">${state.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h3>
           <div className="flex items-center gap-3 mt-1">
-            <p className="text-zinc-400 text-sm">BTC/USDT | Last update: {timeString}</p>
+            <p className="text-zinc-400 text-sm">SPY ETF | Last update: {timeString}</p>
             <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-widest ${regimeColor}`}>
               Regime: {regime}
             </span>

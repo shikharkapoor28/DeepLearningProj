@@ -19,10 +19,10 @@ from evaluation.baselines import BuyAndHoldBaseline, RandomAgentBaseline
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a PPO policy on real Yahoo historical data.")
     parser.add_argument("--ticker", default="SPY")
-    parser.add_argument("--start", default="2024-01-01")
-    parser.add_argument("--end", default="2026-04-18")
+    parser.add_argument("--start", default="2001-01-01")
+    parser.add_argument("--end", default="2026-04-19")
     parser.add_argument("--interval", default="1d", help="yfinance interval: 1m,5m,15m,1h,1d...")
-    parser.add_argument("--timesteps", type=int, default=50_000)
+    parser.add_argument("--timesteps", type=int, default=1000000)
     parser.add_argument("--out", default="experiments/checkpoints/ppo_spy")
     parser.add_argument("--val-ratio", type=float, default=0.2, help="fraction of data reserved for validation")
     parser.add_argument("--eval-freq", type=int, default=10_000, help="timesteps between eval runs")

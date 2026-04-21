@@ -1,59 +1,131 @@
+"""
+Explainability utilities for the Transformer-based PPO trading agent.
+
+Provides two methods:
+1. **Attention weight extraction**: Reads the cached attention weights from
+   TransformerFeaturesExtractor after a forward pass — no random/dummy data.
+2. **Gradient-based feature importance**: Computes input sensitivity via
+   backpropagation through the SB3 policy network.
+
+Both methods operate on SB3's PPO model object directly.
+"""
+
 import torch
 import numpy as np
+from typing import Optional, List
+from stable_baselines3 import PPO
+
+from rl_core.ppo_agent import TransformerFeaturesExtractor
+
 
 class ExplainabilityLayer:
     """
-    Extracts attention weights from Transformer and feature importance to explain agent decisions.
-    Integrates with frontend UI via WebSockets.
+    Extracts real attention weights and gradient-based feature importance
+    from a trained PPO model that uses TransformerFeaturesExtractor.
     """
-    def __init__(self, model):
+
+    FEATURE_NAMES: List[str] = [
+        "Return", "Volatility", "RSI_14", "MACD", "Turbulence", "Volume"
+    ]
+
+    def __init__(self, model: PPO):
         """
-        Expects a trained PPOActorCritic model containing a TransformerEncoder.
+        Args:
+            model: A Stable-Baselines3 PPO model whose policy uses
+                   TransformerFeaturesExtractor.
         """
         self.model = model
+        self._extractor = self._get_extractor()
 
-    def get_attention_weights(self, obs: np.ndarray) -> np.ndarray:
+    def _get_extractor(self) -> Optional[TransformerFeaturesExtractor]:
         """
-        Runs a forward pass and extracts the self-attention weights from the last layer.
+        Navigates SB3's policy object tree to find the
+        TransformerFeaturesExtractor instance.
         """
-        obs_tensor = torch.FloatTensor(obs).unsqueeze(0) # Add batch dim
-        
-        # This requires the TransformerEncoder to hook and store attention weights during forward pass.
-        # Assuming model.encoder.transformer.layers[-1].self_attn stores attention matrices:
-        
         try:
-            # Pseudo-code for extraction:
-            # weights = self.model.encoder.transformer.layers[-1].self_attn.get_attention_weights()
-            # return weights.detach().numpy()
-            
-            # Dummy output for scaffold based on sequence length
-            seq_len = obs.shape[0] if obs.ndim == 2 else 64
-            dummy_attention = np.random.dirichlet(np.ones(seq_len), size=1)[0]
-            return dummy_attention
-            
+            extractor = self.model.policy.features_extractor
+            if isinstance(extractor, TransformerFeaturesExtractor):
+                return extractor
         except AttributeError:
-            return np.array([])
+            pass
+        return None
+
+    def get_attention_weights(self, obs: np.ndarray) -> Optional[np.ndarray]:
+        """
+        Runs a forward pass through the features extractor and returns the
+        real self-attention weights from the last Transformer layer.
+
+        Args:
+            obs: Observation array of shape (seq_len, n_features).
+
+        Returns:
+            Attention weight matrix of shape (seq_len, seq_len) averaged
+            over heads, or None if the extractor is not available.
+        """
+        if self._extractor is None:
+            return None
+
+        obs_tensor = torch.as_tensor(obs, dtype=torch.float32)
+        if obs_tensor.ndim == 2:
+            obs_tensor = obs_tensor.unsqueeze(0)  # add batch dim
+
+        with torch.no_grad():
+            self._extractor(obs_tensor)
+
+        attn = self._extractor.get_attention_weights()
+        if attn is None:
+            return None
+
+        # attn shape: [B, seq_len, seq_len] — take first batch element
+        return attn[0].cpu().numpy()
 
     def get_feature_importance(self, obs: np.ndarray) -> np.ndarray:
         """
-        Approximates feature importance using sensitivity analysis.
-        Calculates gradients of the Critic value with respect to the input features.
+        Computes gradient-based feature importance by backpropagating
+        through the policy's value head.
+
+        The absolute gradient magnitude w.r.t. each input feature,
+        averaged over the sequence dimension, indicates how sensitive
+        the critic's value estimate is to that feature.
+
+        Args:
+            obs: Observation array of shape (seq_len, n_features).
+
+        Returns:
+            Normalized importance scores of shape (n_features,) summing to 1.
         """
-        obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
-        obs_tensor.requires_grad = True
-        
-        # Forward pass to critic
-        action_logits, value = self.model(obs_tensor)
-        
-        # Backprop from value to observe sensitivity of inputs
+        obs_tensor = torch.as_tensor(obs, dtype=torch.float32)
+        if obs_tensor.ndim == 2:
+            obs_tensor = obs_tensor.unsqueeze(0)
+
+        obs_tensor = obs_tensor.clone().detach().requires_grad_(True)
+
+        # SB3 policy: features_extractor -> mlp_extractor -> value_net
+        features = self.model.policy.features_extractor(obs_tensor)
+        latent_pi, latent_vf = self.model.policy.mlp_extractor(features)
+        value = self.model.policy.value_net(latent_vf)
+
         value.backward()
-        
-        # The absolute gradient magnitude indicates feature sensitivity
-        # Averages across the sequence length to get importance per feature
-        sensitivity = torch.abs(obs_tensor.grad).mean(dim=(0, 1)).detach().numpy()
-        
-        # Normalize to sum to 1
-        if sensitivity.sum() > 0:
-            sensitivity = sensitivity / sensitivity.sum()
-            
+
+        if obs_tensor.grad is None:
+            n_feat = obs.shape[-1] if obs.ndim >= 2 else 6
+            return np.ones(n_feat) / n_feat
+
+        # Absolute gradient magnitude averaged over batch and sequence
+        sensitivity = torch.abs(obs_tensor.grad).mean(dim=(0, 1)).detach().cpu().numpy()
+
+        total = sensitivity.sum()
+        if total > 0:
+            sensitivity = sensitivity / total
+
         return sensitivity
+
+    def get_top_features(self, obs: np.ndarray, top_k: int = 4) -> List[str]:
+        """
+        Returns the names of the top-k most important features for this
+        observation based on gradient sensitivity.
+        """
+        importance = self.get_feature_importance(obs)
+        indices = np.argsort(importance)[::-1][:top_k]
+        names = self.FEATURE_NAMES
+        return [names[i] if i < len(names) else f"Feature_{i}" for i in indices]

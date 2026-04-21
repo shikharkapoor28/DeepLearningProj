@@ -25,14 +25,14 @@ environment:
 rl_algorithm:
   name: "PPO"
   hyperparameters:
-    learning_rate: 3.0e-4
-    n_steps: 2048
-    batch_size: 256
+    learning_rate: 5.476374801650067e-05
+    n_steps: 512
+    batch_size: 64
     n_epochs: 10
-    gamma: 0.99
+    gamma: 0.9847362225848427
     gae_lambda: 0.95
     clip_range: 0.2
-    ent_coef: 0.01
+    ent_coef: 0.033588484197052855
 
 model_architecture:
   encoder: "transformer"

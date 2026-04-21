@@ -6,14 +6,14 @@ import { WebSocketClient } from "@/lib/websocket-client";
 
 const MOCK_DATA = (): SimulationPayload => ({
   timestamp: Date.now(),
-  state: { price: 65000 + (Math.random() * 1000 - 500), volume_1h: 1500 + Math.random() * 500, rsi: 45 + Math.random() * 20, macd: 0.5 + Math.random(), turbulence: 0.1 },
+  state: { price: 710.0 + (Math.random() * 5 - 2.5), volume_1h: 1500000 + Math.random() * 50000, rsi: 45 + Math.random() * 20, macd: 0.5 + Math.random(), turbulence: 0.1 },
   action: { 
-    target_weights: { "BTC": 0.6, "USDT": 0.4 }, 
-    executed_trades: [{ asset: "BTC", side: Math.random() > 0.5 ? "buy" : "hold", amount: 0.1, price: 65000 }], 
-    friction_cost: 6.54 
+    target_weights: { "SPY": 0.6, "Cash": 0.4 }, 
+    executed_trades: [{ asset: "SPY", side: ["buy", "sell", "hold"][Math.floor(Math.random() * 3)], amount: 10, price: 710.0 }], 
+    friction_cost: 0.54 
   },
   reward: (Math.random() - 0.4) * 0.05,
-  portfolio: { total_value: 105000 + (Math.random()*100 - 50), cash: 40000, holdings: { "BTC": 65000 }, drawdown: 0.02 + Math.random()*0.01 },
+  portfolio: { total_value: 105000 + (Math.random()*100 - 50), cash: 40000, holdings: { "SPY": 65000 }, drawdown: 0.02 + Math.random()*0.01 },
   explanation: { attention_weights: [0.1, 0.2, 0.5, 0.1, 0.1], top_features: ["volume_spike", "rsi_oversold"] }
 });
 

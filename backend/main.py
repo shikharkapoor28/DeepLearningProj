@@ -9,6 +9,8 @@ from data_pipeline.feature_utils import (
     json_safe,
 )
 from environment.trading_env import TradingEnv
+from rl_core.trainer import get_transformer_policy_kwargs
+from rl_core.explainability import ExplainabilityLayer
 import uvicorn
 import asyncio
 import time
@@ -59,6 +61,7 @@ async def run_live_simulation(session_id: str):
     fetcher = YahooFinanceFetcher(tickers=["SPY"])
     env: Optional[TradingEnv] = None
     policy = None
+    explainer: Optional[ExplainabilityLayer] = None
 
     # Execution mode (paper broker). Default off (env simulation only).
     broker_mode = os.getenv("BROKER_MODE", "env").lower()  # env | paper
@@ -78,7 +81,11 @@ async def run_live_simulation(session_id: str):
     if model_path:
         try:
             from stable_baselines3 import PPO
-            policy = PPO.load(model_path)
+            policy = PPO.load(
+                model_path,
+                custom_objects={"policy_kwargs": get_transformer_policy_kwargs()},
+            )
+            explainer = ExplainabilityLayer(policy)
             print(f"Loaded PPO model from {model_path}")
         except Exception as e:
             print(f"Failed to load PPO model at {model_path}: {e}")
@@ -262,7 +269,19 @@ async def run_live_simulation(session_id: str):
                 # Keep env stepping so reward/obs still make sense for streaming (but portfolio comes from broker)
                 _, reward, _, _, _ = env.step(np.array([target_w], dtype=np.float32))
         
-        # 3. Build payload
+        # 3. Build explanation from real explainability layer
+        explanation_payload = {"attention_weights": None, "top_features": []}
+        if explainer is not None and env is not None and env.state is not None:
+            try:
+                attn = explainer.get_attention_weights(env.state)
+                if attn is not None:
+                    # Send average attention over the last row (most recent timestep)
+                    explanation_payload["attention_weights"] = attn[-1].tolist()
+                explanation_payload["top_features"] = explainer.get_top_features(env.state)
+            except Exception:
+                pass
+
+        # 4. Build payload
         payload = {
             "timestamp": int(time.time() * 1000),
             "state": {
@@ -284,13 +303,10 @@ async def run_live_simulation(session_id: str):
                 "holdings": {"SPY": float(portfolio_holdings_value)},
                 "drawdown": float(portfolio_drawdown),
             },
-            "explanation": {
-                "attention_weights": [0.4, 0.3, 0.1, 0.2],
-                "top_features": ["Return", "Volatility", "RSI_14", "Turbulence"]
-            }
+            "explanation": explanation_payload,
         }
         
-        # 4. Broadcast real yfinance metrics to frontend
+        # 5. Broadcast real yfinance metrics to frontend
         await manager.broadcast(json_safe(payload), session_id)
         
         # Wait before next tick (simulating 1.5-second live ticks for UI)
