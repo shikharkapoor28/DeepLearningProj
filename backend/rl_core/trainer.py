@@ -128,14 +128,15 @@ class RLTrainer:
             "MlpPolicy",
             env,
             policy_kwargs=policy_kwargs,
+            # PPO Hyperparameters (with typical RL defaults)
             learning_rate=hyperparams.get("learning_rate", 3e-4),
-            n_steps=hyperparams.get("n_steps", 2048),
-            batch_size=hyperparams.get("batch_size", 256),
-            n_epochs=hyperparams.get("n_epochs", 10),
-            gamma=hyperparams.get("gamma", 0.99),
-            gae_lambda=hyperparams.get("gae_lambda", 0.95),
-            clip_range=hyperparams.get("clip_range", 0.2),
-            ent_coef=hyperparams.get("ent_coef", 0.01),
+            n_steps=hyperparams.get("n_steps", 2048),        # Rollout length before policy update
+            batch_size=hyperparams.get("batch_size", 256),   # Minibatch size for optimization
+            n_epochs=hyperparams.get("n_epochs", 10),        # Number of epochs to train on the rollout
+            gamma=hyperparams.get("gamma", 0.99),            # Discount factor for future rewards
+            gae_lambda=hyperparams.get("gae_lambda", 0.95),  # Advantage estimation smoothing factor
+            clip_range=hyperparams.get("clip_range", 0.2),   # PPO clipping mechanism to prevent large updates
+            ent_coef=hyperparams.get("ent_coef", 0.01),      # Entropy coefficient to encourage exploration
             verbose=1,
             tensorboard_log=self._log_dir if self._has_tensorboard() else None,
         )

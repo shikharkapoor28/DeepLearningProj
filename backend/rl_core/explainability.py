@@ -98,9 +98,10 @@ class ExplainabilityLayer:
         if obs_tensor.ndim == 2:
             obs_tensor = obs_tensor.unsqueeze(0)
 
+        # Clone the tensor and require gradients to compute sensitivity via backprop
         obs_tensor = obs_tensor.clone().detach().requires_grad_(True)
 
-        # SB3 policy: features_extractor -> mlp_extractor -> value_net
+        # SB3 policy architecture: features_extractor -> mlp_extractor -> value_net
         features = self.model.policy.features_extractor(obs_tensor)
         latent_pi, latent_vf = self.model.policy.mlp_extractor(features)
         value = self.model.policy.value_net(latent_vf)
@@ -126,6 +127,7 @@ class ExplainabilityLayer:
         observation based on gradient sensitivity.
         """
         importance = self.get_feature_importance(obs)
+        # Sort indices by highest importance descending
         indices = np.argsort(importance)[::-1][:top_k]
         names = self.FEATURE_NAMES
         return [names[i] if i < len(names) else f"Feature_{i}" for i in indices]

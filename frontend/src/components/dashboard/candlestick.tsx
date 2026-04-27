@@ -12,6 +12,7 @@ export function CandlestickChart({ history }: { history: SimulationPayload[] }) 
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    // Initialize the TradingView lightweight chart instance
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
@@ -55,7 +56,7 @@ export function CandlestickChart({ history }: { history: SimulationPayload[] }) 
 
     // Convert payload history to OHLC format
     // Since we only stream close prices locally, we mock OHLC based on the single price point stream 
-    // for this visualization task. In production, the backend streams actual OHLC bars.
+    // for this visualization task. In a full production deployment, the backend streams actual OHLC bars.
     const data = history.map((record, index) => {
       const prevPrice = index > 0 ? history[index - 1].state.price : record.state.price;
       const isUp = record.state.price >= prevPrice;

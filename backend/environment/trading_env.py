@@ -27,7 +27,9 @@ class TradingEnv(gym.Env):
         super().__init__()
 
         self.config = config or {}
+        # Parse environment configuration, with fallback defaults
         self.initial_balance = float(self.config.get("initial_balance", 100000.0))
+        # Convert bps (basis points) to fractional rates (e.g., 6 bps = 0.0006)
         self.trading_fee = float(self.config.get("trading_fee_bps", 6)) / 10000.0
         self.slippage = float(self.config.get("slippage_bps", 0)) / 10000.0
         self.reward_scaling = float(self.config.get("reward_scaling", 1.0))
@@ -140,6 +142,12 @@ class TradingEnv(gym.Env):
         return self.state, info
 
     def step(self, action) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
+        """
+        Executes one trading step within the environment.
+        The action is a target portfolio weight between 0.0 (all cash) and 1.0 (all asset).
+        We calculate turnover, apply friction (fees + slippage), update portfolio value,
+        and calculate the log-return reward.
+        """
         action = np.asarray(action, dtype=np.float32).reshape(-1)
         w_target = float(np.clip(action[0], 0.0, 1.0))
 
@@ -156,15 +164,22 @@ class TradingEnv(gym.Env):
                 if self.state is None:
                     self.state = np.zeros(self.observation_space.shape, dtype=np.float32)
             else:
+                # Calculate the raw market return for this step
                 ret = float(self._close_prices[i + 1] / self._close_prices[i] - 1.0)
+                # Grow or shrink the portfolio value based on current allocation
                 self.portfolio_value *= self.weight * (1.0 + ret) + (1.0 - self.weight)
 
+                # Weight drifts as the asset price changes relative to cash
                 w_after_return = (
                     (self.weight * (1.0 + ret))
                     / (self.weight * (1.0 + ret) + (1.0 - self.weight) + 1e-12)
                 )
+                
+                # We only pay fees on the *difference* between our target and drifted weight
                 turnover = abs(w_target - w_after_return)
                 cost_rate = turnover * (self.trading_fee + self.slippage)
+                
+                # Apply friction costs
                 self.portfolio_value *= max(0.0, 1.0 - cost_rate)
                 self.weight = w_target
 

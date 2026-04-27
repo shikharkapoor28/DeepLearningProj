@@ -23,11 +23,11 @@ class FeatureEngineer:
         # Volatility (Rolling standard deviation of returns)
         df['volatility'] = df['return_1p'].rolling(window=20).std()
         
-        # RSI
+        # RSI (Relative Strength Index) to measure momentum and overbought/oversold conditions
         df.ta.rsi(length=14, append=True)
         rsi_col = [c for c in df.columns if 'RSI' in c][0]
         
-        # MACD
+        # MACD (Moving Average Convergence Divergence) for trend following
         df.ta.macd(fast=12, slow=26, signal=9, append=True)
         macd_col = [c for c in df.columns if 'MACD_12_26_9' in c][0]
         
@@ -38,7 +38,7 @@ class FeatureEngineer:
         # Clean NaNs caused by rolling windows
         df.dropna(inplace=True)
         
-        # Normalization to [-1, 1] using tanh or min-max clipping
+        # Normalization to [-1, 1] using tanh clipping to gracefully bound extreme outliers
         df_norm = self._normalize_features(df, [rsi_col, macd_col, 'volatility', 'return_1p', 'turbulence', 'Volume'])
         
         return df_norm

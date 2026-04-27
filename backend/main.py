@@ -1,28 +1,39 @@
+"""
+Main Application Entrypoint.
+
+This module is responsible for running the FastAPI application and orchestrating
+the core live trading simulation. It ties together the data pipeline, the RL
+trading environment, the trained policy, and the websocket communication with the frontend.
+"""
+
+# Standard Library Imports
+import asyncio
+import math
+import os
+import time
+from typing import Dict, Optional, Tuple
+
+# Third-Party Imports
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
+import pandas as pd
+import uvicorn
+
+# Local Application Imports
 from api.websocket_manager import ConnectionManager
-from data_pipeline.fetcher import YahooFinanceFetcher
+from broker.base import Order
+from broker.paper import PaperBroker, PaperBrokerConfig
 from data_pipeline.feature_utils import (
     build_feature_matrix,
     compute_features,
     flatten_yfinance_columns,
     json_safe,
 )
+from data_pipeline.fetcher import YahooFinanceFetcher
 from environment.trading_env import TradingEnv
-from rl_core.trainer import get_transformer_policy_kwargs
 from rl_core.explainability import ExplainabilityLayer
-import uvicorn
-import asyncio
-import time
-from typing import Dict, Optional, Tuple
-
-import numpy as np
-import pandas as pd
-import math
-import os
-
-from broker.paper import PaperBroker, PaperBrokerConfig
-from broker.base import Order
+from rl_core.trainer import get_transformer_policy_kwargs
 
 app = FastAPI(title="Trading RL System API")
 
@@ -314,10 +325,17 @@ async def run_live_simulation(session_id: str):
 
 @app.get("/api/v1/health")
 async def health_check():
+    """
+    Basic health check endpoint. Useful for monitoring the service uptime.
+    """
     return {"status": "ok", "uptime": 0, "db_connected": False}
 
 @app.post("/api/v1/simulation/start")
 async def start_simulation(payload: dict):
+    """
+    Kicks off the live trading simulation as a background task.
+    If a simulation is already running, we restart it.
+    """
     global simulation_task, is_simulating
     session_id = payload.get("session_id", "demo_session")
     
@@ -332,6 +350,9 @@ async def start_simulation(payload: dict):
 
 @app.post("/api/v1/simulation/stop")
 async def stop_simulation():
+    """
+    Gracefully stops the running live simulation.
+    """
     global simulation_task, is_simulating
     is_simulating = False
     if simulation_task:
@@ -340,6 +361,10 @@ async def stop_simulation():
 
 @app.websocket("/ws/simulation/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    """
+    Websocket endpoint for streaming live data metrics and RL agent actions 
+    directly to the frontend dashboard.
+    """
     await manager.connect(websocket, session_id)
     try:
         while True:

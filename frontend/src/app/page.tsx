@@ -12,11 +12,12 @@ import { SimulationControls } from "@/components/dashboard/simulation-controls";
 import { EquityCurvePanel } from "@/components/dashboard/equity-curve";
 
 export default function Dashboard() {
+  // Establish WebSocket connection and retrieve state for the simulation session
   const { data, history, isConnected, sendCommand } = useSimulationStream("demo_session");
   const [replayIndex, setReplayIndex] = useState<number | null>(null);
 
   // Task 3: Replay System Logic
-  // If we are in replay mode, we slice the history and extract the specific focused data point to pass to the UI
+  // If the user scrubs the timeline, we freeze the live view and extract the historical slice
   const isReplaying = replayIndex !== null;
   const displayHistory = isReplaying ? history.slice(0, replayIndex! + 1) : history;
   const displayData = displayHistory.length > 0 ? displayHistory[displayHistory.length - 1] : data;

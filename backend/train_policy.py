@@ -1,3 +1,12 @@
+"""
+Policy Training Script.
+
+This module fetches historical market data, computes technical indicators,
+and trains a PPO (Proximal Policy Optimization) reinforcement learning agent
+to trade. It automatically splits data into training and validation sets
+and evaluates the trained model against Buy-and-Hold and Random baselines.
+"""
+
 import argparse
 import os
 from pathlib import Path
@@ -17,6 +26,11 @@ from evaluation.baselines import BuyAndHoldBaseline, RandomAgentBaseline
 
 
 def main() -> None:
+    """
+    Main entry point for the RL training pipeline.
+    Parses command-line arguments, sets up the train/val environments,
+    trains the PPO policy, and runs an evaluation backtest.
+    """
     parser = argparse.ArgumentParser(description="Train a PPO policy on real Yahoo historical data.")
     parser.add_argument("--ticker", default="SPY")
     parser.add_argument("--start", default="2001-01-01")

@@ -10,6 +10,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, session_id: str):
+        """Accepts a new WebSocket connection and maps it to the specific trading session."""
         await websocket.accept()
         if session_id not in self.active_connections:
             self.active_connections[session_id] = []
@@ -25,6 +26,10 @@ class ConnectionManager:
         await websocket.send_text(message)
 
     async def broadcast(self, message: dict, session_id: str):
+        """
+        Broadcasts a serialized JSON payload to all active clients 
+        connected to the specified session.
+        """
         if session_id in self.active_connections:
             # Serialize once for all clients in session
             payload = json.dumps(message)
